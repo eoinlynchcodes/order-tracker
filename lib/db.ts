@@ -125,6 +125,11 @@ export async function updateNotes(id: number, notes: string | null): Promise<Ord
   return rows[0] ? rowToOrder(rows[0]) : null;
 }
 
+export async function hardDeleteOrder(id: number): Promise<boolean> {
+  const { rowCount } = await sql`DELETE FROM orders WHERE id = ${id}`;
+  return (rowCount ?? 0) > 0;
+}
+
 export async function softDeleteOrder(id: number): Promise<boolean> {
   const { rowCount } = await sql`
     UPDATE orders SET deleted_at = NOW(), updated_at = NOW()

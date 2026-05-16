@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrder, softDeleteOrder, updateNotes, updateOrder } from "@/lib/db";
+import { del } from "@vercel/blob";
+import { getOrder, hardDeleteOrder, softDeleteOrder, updateNotes, updateOrder } from "@/lib/db";
 import type { OrderItem, PaymentTerms } from "@/lib/types";
 import { PAYMENT_TERMS } from "@/lib/types";
 
@@ -51,8 +52,25 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_: NextRequest, { params }: Ctx) {
+export async function DELETE(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
+  const hard = new URL(req.url).searchParams.get("hard") === "true";
+
+  if (hard) {
+    const order = await getOrder(Number(id));
+    if (!order) return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (order.invoice_file_url) {
+      try {
+        await del(order.invoice_file_url);
+      } catch (err) {
+        console.error(`Failed to delete blob for order ${id}:`, err);
+      }
+    }
+    const ok = await hardDeleteOrder(Number(id));
+    if (!ok) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, hard: true });
+  }
+
   const ok = await softDeleteOrder(Number(id));
   if (!ok) return NextResponse.json({ error: "not found or already deleted" }, { status: 404 });
   return NextResponse.json({ ok: true });

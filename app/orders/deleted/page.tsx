@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listDeletedOrders } from "@/lib/db";
 import { RestoreOrderButton } from "@/components/RestoreOrderButton";
+import { PurgeOrderButton } from "@/components/PurgeOrderButton";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,10 @@ export default async function DeletedOrdersPage() {
                   {o.deleted_at ? new Date(o.deleted_at).toLocaleString() : "—"}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <RestoreOrderButton orderId={o.id} />
+                  <div className="inline-flex gap-2">
+                    <RestoreOrderButton orderId={o.id} />
+                    <PurgeOrderButton orderId={o.id} supplierName={o.supplier_name} />
+                  </div>
                 </td>
               </tr>
             ))}
