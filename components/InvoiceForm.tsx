@@ -1,7 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/heic",
+];
+const ACCEPT_ATTR = ACCEPTED_TYPES.join(",");
+const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 export function InvoiceForm({
   orderId,
@@ -28,11 +38,19 @@ export function InvoiceForm({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadFile(file: File) {
     setError(null);
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setError(`Unsupported file type: ${file.type || "(unknown)"}. Use PDF or PNG/JPEG/WebP/HEIC.`);
+      return;
+    }
+    if (file.size > MAX_SIZE_BYTES) {
+      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 10MB.`);
+      return;
+    }
     setUploading(true);
     const form = new FormData();
     form.append("file", file);
@@ -48,6 +66,32 @@ export function InvoiceForm({
     }
     const data = await res.json();
     setFileUrl(data.url);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) void uploadFile(file);
+    e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (uploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) void uploadFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    if (uploading) return;
+    e.dataTransfer.dropEffect = "copy";
+    if (!isDragOver) setIsDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setIsDragOver(false);
   }
 
   async function submit(e: React.FormEvent) {
@@ -120,35 +164,70 @@ export function InvoiceForm({
         </Field>
 
         <Field label="Or upload the invoice file (PDF / image, max 10MB)">
-          <div className="flex items-center gap-3">
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !uploading) {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Drop a file here or click to browse"
+            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 text-center transition ${
+              isDragOver
+                ? "border-blue-500 bg-blue-50"
+                : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100"
+            } ${uploading ? "pointer-events-none opacity-60" : ""}`}
+          >
             <input
+              ref={fileInputRef}
               type="file"
-              accept="application/pdf,image/png,image/jpeg,image/webp,image/heic"
-              onChange={handleFile}
+              accept={ACCEPT_ATTR}
+              onChange={handleInputChange}
               disabled={uploading}
-              className="text-sm"
+              className="sr-only"
+              tabIndex={-1}
             />
-            {uploading && <span className="text-xs text-slate-500">Uploading…</span>}
-            {fileUrl && (
+            {uploading ? (
+              <p className="text-sm text-slate-600">Uploading…</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-slate-700">
+                  Drop file here or click to browse
+                </p>
+                <p className="mt-1 text-xs text-slate-500">PDF, PNG, JPEG, WebP, HEIC — up to 10MB</p>
+              </>
+            )}
+          </div>
+
+          {fileUrl && (
+            <div className="mt-2 flex items-center gap-3 text-xs">
               <a
                 href={fileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-blue-700 hover:underline"
+                className="text-blue-700 hover:underline"
               >
                 view uploaded file ↗
               </a>
-            )}
-            {fileUrl && (
               <button
                 type="button"
-                onClick={() => setFileUrl("")}
-                className="text-xs text-red-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFileUrl("");
+                }}
+                className="text-red-600 hover:underline"
               >
                 remove
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </Field>
       </div>
 
