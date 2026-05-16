@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/db";
 import { computeStatus, PAYMENT_TERMS } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DeleteOrderButton } from "@/components/DeleteOrderButton";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function OrderDetail({
           >
             Edit
           </Link>
+          <DeleteOrderButton orderId={order.id} supplierName={order.supplier_name} />
           {!order.actual_delivery_date && (
             <Link
               href={`/orders/${order.id}/delivery`}

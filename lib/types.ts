@@ -42,6 +42,7 @@ export type Order = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 };
 
 export function computeStatus(order: Order, today = new Date()): OrderStatus {

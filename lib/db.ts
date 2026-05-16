@@ -39,6 +39,7 @@ function rowToOrder(row: Record<string, unknown>): Order {
     notes: (row.notes as string | null) ?? null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    deleted_at: row.deleted_at ? String(row.deleted_at) : null,
   };
 }
 
@@ -49,8 +50,24 @@ function toDateStr(v: unknown): string {
 }
 
 export async function listOrders(): Promise<Order[]> {
-  const { rows } = await sql`SELECT * FROM orders ORDER BY order_date DESC, id DESC`;
+  const { rows } = await sql`
+    SELECT * FROM orders WHERE deleted_at IS NULL
+    ORDER BY order_date DESC, id DESC
+  `;
   return rows.map(rowToOrder);
+}
+
+export async function listDeletedOrders(): Promise<Order[]> {
+  const { rows } = await sql`
+    SELECT * FROM orders WHERE deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
+  `;
+  return rows.map(rowToOrder);
+}
+
+export async function countDeletedOrders(): Promise<number> {
+  const { rows } = await sql`SELECT COUNT(*)::int AS n FROM orders WHERE deleted_at IS NOT NULL`;
+  return Number(rows[0]?.n ?? 0);
 }
 
 export async function getOrder(id: number): Promise<Order | null> {
@@ -108,8 +125,19 @@ export async function updateNotes(id: number, notes: string | null): Promise<Ord
   return rows[0] ? rowToOrder(rows[0]) : null;
 }
 
-export async function deleteOrder(id: number): Promise<boolean> {
-  const { rowCount } = await sql`DELETE FROM orders WHERE id = ${id}`;
+export async function softDeleteOrder(id: number): Promise<boolean> {
+  const { rowCount } = await sql`
+    UPDATE orders SET deleted_at = NOW(), updated_at = NOW()
+    WHERE id = ${id} AND deleted_at IS NULL
+  `;
+  return (rowCount ?? 0) > 0;
+}
+
+export async function restoreOrder(id: number): Promise<boolean> {
+  const { rowCount } = await sql`
+    UPDATE orders SET deleted_at = NULL, updated_at = NOW()
+    WHERE id = ${id} AND deleted_at IS NOT NULL
+  `;
   return (rowCount ?? 0) > 0;
 }
 

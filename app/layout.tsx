@@ -1,13 +1,17 @@
 import "./globals.css";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { countDeletedOrders } from "@/lib/db";
 
 export const metadata = {
   title: "Order Tracker",
   description: "Order-to-cash tracking for landscaping supplies",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const dynamic = "force-dynamic";
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const deletedCount = await safeCount();
   return (
     <html lang="en">
       <body className="min-h-screen text-slate-900">
@@ -20,6 +24,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/" className="hover:underline">Dashboard</Link>
               <Link href="/orders/new" className="hover:underline">New Order</Link>
               <a href="/api/orders/export" className="hover:underline">Export CSV</a>
+              <Link href="/orders/deleted" className="text-slate-500 hover:underline">
+                Deleted{deletedCount > 0 ? ` (${deletedCount})` : ""}
+              </Link>
             </nav>
           </div>
         </header>
@@ -27,4 +34,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </body>
     </html>
   );
+}
+
+async function safeCount(): Promise<number> {
+  try {
+    return await countDeletedOrders();
+  } catch {
+    return 0;
+  }
 }

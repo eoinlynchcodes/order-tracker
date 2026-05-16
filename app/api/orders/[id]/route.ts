@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteOrder, getOrder, updateNotes, updateOrder } from "@/lib/db";
+import { getOrder, softDeleteOrder, updateNotes, updateOrder } from "@/lib/db";
 import type { OrderItem, PaymentTerms } from "@/lib/types";
 import { PAYMENT_TERMS } from "@/lib/types";
 
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
 export async function DELETE(_: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  const ok = await deleteOrder(Number(id));
-  if (!ok) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const ok = await softDeleteOrder(Number(id));
+  if (!ok) return NextResponse.json({ error: "not found or already deleted" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
