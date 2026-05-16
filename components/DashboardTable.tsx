@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { computeStatus, type Order, type OrderStatus } from "@/lib/types";
+import { type Order, type OrderStatus } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 
 type Row = { order: Order; status: OrderStatus };
+
+export type SortKey = "order_date" | "amount" | "due_date";
+export type SortDir = "asc" | "desc";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "pending", label: "Pending" },
@@ -14,7 +17,17 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "paid", label: "Paid" },
 ];
 
-export function DashboardTable({ rows }: { rows: Row[] }) {
+export function DashboardTable({
+  rows,
+  filter,
+  sortKey,
+  sortDir,
+}: {
+  rows: Row[];
+  filter: OrderStatus | null;
+  sortKey: SortKey;
+  sortDir: SortDir;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -80,11 +93,17 @@ export function DashboardTable({ rows }: { rows: Row[] }) {
             <tr>
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Supplier</th>
-              <th className="px-3 py-2">Order Date</th>
+              <th className="px-3 py-2">
+                <SortHeader label="Order Date" col="order_date" filter={filter} sortKey={sortKey} sortDir={sortDir} />
+              </th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Invoice</th>
-              <th className="px-3 py-2">Amount</th>
-              <th className="px-3 py-2">Due</th>
+              <th className="px-3 py-2">
+                <SortHeader label="Amount" col="amount" filter={filter} sortKey={sortKey} sortDir={sortDir} />
+              </th>
+              <th className="px-3 py-2">
+                <SortHeader label="Due" col="due_date" filter={filter} sortKey={sortKey} sortDir={sortDir} />
+              </th>
               <th className="px-3 py-2">Paid</th>
               <th className="px-3 py-2">Notes</th>
               <th className="px-3 py-2"></th>
@@ -270,5 +289,38 @@ function NotesCell({ order }: { order: Order }) {
         <span className="text-slate-400">+ Add notes</span>
       )}
     </button>
+  );
+}
+
+function SortHeader({
+  label,
+  col,
+  filter,
+  sortKey,
+  sortDir,
+}: {
+  label: string;
+  col: SortKey;
+  filter: OrderStatus | null;
+  sortKey: SortKey;
+  sortDir: SortDir;
+}) {
+  const active = sortKey === col;
+  const nextDir: SortDir = active && sortDir === "desc" ? "asc" : "desc";
+  const params = new URLSearchParams();
+  if (filter) params.set("status", filter);
+  params.set("sort", col);
+  params.set("dir", active ? nextDir : "desc");
+  const indicator = active ? (sortDir === "desc" ? "↓" : "↑") : "";
+  return (
+    <Link
+      href={`/?${params.toString()}`}
+      className={`inline-flex items-center gap-1 hover:text-slate-900 ${
+        active ? "text-slate-900" : ""
+      }`}
+    >
+      {label}
+      <span className="text-[10px] opacity-70">{indicator || "↕"}</span>
+    </Link>
   );
 }
