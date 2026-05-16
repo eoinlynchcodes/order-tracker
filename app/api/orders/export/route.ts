@@ -11,9 +11,8 @@ export async function GET() {
   const headers = [
     "id",
     "status",
-    "customer_name",
+    "supplier_name",
     "contact_number",
-    "delivery_address",
     "items",
     "order_date",
     "expected_delivery_date",
@@ -21,6 +20,8 @@ export async function GET() {
     "invoice_number",
     "invoice_amount",
     "invoice_date",
+    "invoice_url",
+    "invoice_file_url",
     "payment_terms",
     "payment_due_date",
     "paid",
@@ -31,13 +32,12 @@ export async function GET() {
 
   const lines = [headers.join(",")];
   for (const o of orders) {
-    const itemsStr = o.items.map((i) => `${i.quantity}x ${i.name}${i.unit ? " " + i.unit : ""}`).join("; ");
+    const itemsStr = o.items.map((i) => `${i.quantity}x ${i.name}`).join("; ");
     const row = [
       o.id,
       computeStatus(o),
-      o.customer_name,
+      o.supplier_name,
       o.contact_number ?? "",
-      o.delivery_address,
       itemsStr,
       o.order_date,
       o.expected_delivery_date ?? "",
@@ -45,6 +45,8 @@ export async function GET() {
       o.invoice_number ?? "",
       o.invoice_amount ?? "",
       o.invoice_date ?? "",
+      o.invoice_url ?? "",
+      o.invoice_file_url ?? "",
       o.payment_terms,
       o.payment_due_date ?? "",
       o.paid ? "yes" : "no",

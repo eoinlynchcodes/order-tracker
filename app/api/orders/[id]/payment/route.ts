@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { recordPayment } from "@/lib/db";
+import { clearPayment, recordPayment } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +19,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const updated = await recordPayment(Number(id), body.paid_date, amount);
+  if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(_: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const updated = await clearPayment(Number(id));
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);
 }

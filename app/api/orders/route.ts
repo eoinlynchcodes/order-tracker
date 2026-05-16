@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
   const order = await createOrder({
-    customer_name: String(body.customer_name).trim(),
+    supplier_name: String(body.supplier_name).trim(),
     contact_number: body.contact_number ? String(body.contact_number).trim() : null,
-    delivery_address: String(body.delivery_address).trim(),
+    delivery_address: body.delivery_address ? String(body.delivery_address).trim() : null,
     items: body.items as OrderItem[],
     order_date: String(body.order_date),
     expected_delivery_date: body.expected_delivery_date || null,
@@ -30,8 +30,7 @@ export async function POST(req: NextRequest) {
 }
 
 function validate(body: Record<string, unknown>): string | null {
-  if (!body.customer_name || typeof body.customer_name !== "string") return "customer_name required";
-  if (!body.delivery_address || typeof body.delivery_address !== "string") return "delivery_address required";
+  if (!body.supplier_name || typeof body.supplier_name !== "string") return "supplier_name required";
   if (!body.order_date || typeof body.order_date !== "string") return "order_date required";
   if (!Array.isArray(body.items) || body.items.length === 0) return "items required (non-empty array)";
   for (const item of body.items as OrderItem[]) {

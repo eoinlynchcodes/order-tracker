@@ -14,8 +14,16 @@ export default async function PaymentPage({
   if (!order) notFound();
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold">Record payment — Order #{order.id}</h1>
-      <PaymentForm orderId={order.id} invoiceAmount={order.invoice_amount} />
+      <h1 className="mb-4 text-2xl font-semibold">
+        {order.paid ? "Edit payment" : "Record payment"} — Order #{order.id}
+      </h1>
+      <PaymentForm
+        orderId={order.id}
+        invoiceAmount={order.invoice_amount}
+        initialPaid={order.paid}
+        initialPaidDate={order.paid_date}
+        initialPaidAmount={order.paid_amount}
+      />
     </div>
   );
 }

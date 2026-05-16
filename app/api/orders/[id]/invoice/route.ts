@@ -20,8 +20,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!body.invoice_date || typeof body.invoice_date !== "string") {
     return NextResponse.json({ error: "invoice_date required" }, { status: 400 });
   }
+  const invoice_url = typeof body.invoice_url === "string" && body.invoice_url.trim() ? body.invoice_url.trim() : null;
+  const invoice_file_url = typeof body.invoice_file_url === "string" && body.invoice_file_url.trim() ? body.invoice_file_url.trim() : null;
 
-  const updated = await recordInvoice(Number(id), body.invoice_number, amount, body.invoice_date);
+  const updated = await recordInvoice(
+    Number(id),
+    body.invoice_number,
+    amount,
+    body.invoice_date,
+    invoice_url,
+    invoice_file_url,
+  );
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);
 }

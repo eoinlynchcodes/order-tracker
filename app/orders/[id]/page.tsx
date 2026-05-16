@@ -42,30 +42,33 @@ export default async function OrderDetail({
               Confirm delivery
             </Link>
           )}
-          {order.actual_delivery_date && !order.invoice_number && (
+          {order.actual_delivery_date && (
             <Link
               href={`/orders/${order.id}/invoice`}
-              className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white hover:bg-amber-700"
+              className={`rounded px-3 py-1.5 text-sm text-white ${
+                order.invoice_number ? "bg-slate-500 hover:bg-slate-600" : "bg-amber-600 hover:bg-amber-700"
+              }`}
             >
-              Add invoice
+              {order.invoice_number ? "Edit invoice" : "Add invoice"}
             </Link>
           )}
-          {order.invoice_number && !order.paid && (
+          {order.invoice_number && (
             <Link
               href={`/orders/${order.id}/payment`}
-              className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
+              className={`rounded px-3 py-1.5 text-sm text-white ${
+                order.paid ? "bg-slate-500 hover:bg-slate-600" : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
-              Record payment
+              {order.paid ? "Edit payment" : "Record payment"}
             </Link>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card title="Customer">
-          <Row label="Name">{order.customer_name}</Row>
+        <Card title="Supplier">
+          <Row label="Name">{order.supplier_name}</Row>
           <Row label="Contact">{order.contact_number ?? "—"}</Row>
-          <Row label="Delivery address">{order.delivery_address}</Row>
         </Card>
 
         <Card title="Schedule">
@@ -91,7 +94,7 @@ export default async function OrderDetail({
 
         <Card title="Invoice">
           <Row label="Invoice #">{order.invoice_number ?? "—"}</Row>
-          <Row label="Amount">{order.invoice_amount ? `$${order.invoice_amount}` : "—"}</Row>
+          <Row label="Amount">{order.invoice_amount ? `€${order.invoice_amount}` : "—"}</Row>
           <Row label="Invoice date">{order.invoice_date ?? "—"}</Row>
           <Row label="Payment terms">{termsLabel}</Row>
           <Row label="Payment due">
@@ -99,12 +102,40 @@ export default async function OrderDetail({
               {order.payment_due_date ?? "—"}
             </span>
           </Row>
+          <Row label="Invoice file">
+            {order.invoice_file_url ? (
+              <a
+                href={order.invoice_file_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-700 hover:underline"
+              >
+                Open file ↗
+              </a>
+            ) : (
+              "—"
+            )}
+          </Row>
+          <Row label="Invoice link">
+            {order.invoice_url ? (
+              <a
+                href={order.invoice_url}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all text-blue-700 hover:underline"
+              >
+                {order.invoice_url}
+              </a>
+            ) : (
+              "—"
+            )}
+          </Row>
         </Card>
 
         <Card title="Payment">
           <Row label="Paid">{order.paid ? "Yes" : "No"}</Row>
           <Row label="Paid date">{order.paid_date ?? "—"}</Row>
-          <Row label="Paid amount">{order.paid_amount ? `$${order.paid_amount}` : "—"}</Row>
+          <Row label="Paid amount">{order.paid_amount ? `€${order.paid_amount}` : "—"}</Row>
         </Card>
 
         {order.notes && (
@@ -135,14 +166,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function ItemTable({ items }: { items: { name: string; quantity: number; unit?: string }[] }) {
+function ItemTable({ items }: { items: { name: string; quantity: number }[] }) {
   return (
     <table className="w-full text-sm">
       <thead className="text-left text-xs uppercase text-slate-500">
         <tr>
           <th className="py-1">Item</th>
           <th className="py-1 text-right">Qty</th>
-          <th className="py-1">Unit</th>
         </tr>
       </thead>
       <tbody>
@@ -150,7 +180,6 @@ function ItemTable({ items }: { items: { name: string; quantity: number; unit?: 
           <tr key={i} className="border-t border-slate-100">
             <td className="py-1">{it.name}</td>
             <td className="py-1 text-right">{it.quantity}</td>
-            <td className="py-1 text-slate-500">{it.unit ?? "—"}</td>
           </tr>
         ))}
       </tbody>
@@ -162,17 +191,17 @@ function DeliveryComparison({
   ordered,
   delivered,
 }: {
-  ordered: { name: string; quantity: number; unit?: string }[];
-  delivered: { name: string; quantity: number; unit?: string }[];
+  ordered: { name: string; quantity: number }[];
+  delivered: { name: string; quantity: number }[];
 }) {
-  const map = new Map<string, { ordered: number; delivered: number; unit?: string }>();
+  const map = new Map<string, { ordered: number; delivered: number }>();
   for (const o of ordered) {
-    map.set(o.name, { ordered: o.quantity, delivered: 0, unit: o.unit });
+    map.set(o.name, { ordered: o.quantity, delivered: 0 });
   }
   for (const d of delivered) {
     const existing = map.get(d.name);
     if (existing) existing.delivered = d.quantity;
-    else map.set(d.name, { ordered: 0, delivered: d.quantity, unit: d.unit });
+    else map.set(d.name, { ordered: 0, delivered: d.quantity });
   }
   return (
     <table className="w-full text-sm">
@@ -189,7 +218,7 @@ function DeliveryComparison({
           const diff = row.delivered - row.ordered;
           return (
             <tr key={name} className="border-t border-slate-100">
-              <td className="py-1">{name} {row.unit && <span className="text-xs text-slate-500">({row.unit})</span>}</td>
+              <td className="py-1">{name}</td>
               <td className="py-1 text-right">{row.ordered}</td>
               <td className="py-1 text-right">{row.delivered}</td>
               <td className={`py-1 text-right ${diff === 0 ? "text-slate-500" : "font-semibold text-red-700"}`}>

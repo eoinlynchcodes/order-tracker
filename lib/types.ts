@@ -10,7 +10,6 @@ export const PAYMENT_TERMS: { value: PaymentTerms; label: string; days: number |
 export type OrderItem = {
   name: string;
   quantity: number;
-  unit?: string;
 };
 
 export type OrderStatus =
@@ -22,9 +21,9 @@ export type OrderStatus =
 
 export type Order = {
   id: number;
-  customer_name: string;
+  supplier_name: string;
   contact_number: string | null;
-  delivery_address: string;
+  delivery_address: string | null;
   items: OrderItem[];
   order_date: string;
   expected_delivery_date: string | null;
@@ -33,6 +32,8 @@ export type Order = {
   invoice_number: string | null;
   invoice_amount: string | null;
   invoice_date: string | null;
+  invoice_url: string | null;
+  invoice_file_url: string | null;
   payment_terms: PaymentTerms;
   payment_due_date: string | null;
   paid: boolean;

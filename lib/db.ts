@@ -3,9 +3,9 @@ import type { Order, OrderItem, PaymentTerms } from "./types";
 import { paymentDueDate } from "./types";
 
 export type CreateOrderInput = {
-  customer_name: string;
+  supplier_name: string;
   contact_number?: string | null;
-  delivery_address: string;
+  delivery_address?: string | null;
   items: OrderItem[];
   order_date: string;
   expected_delivery_date?: string | null;
@@ -18,9 +18,9 @@ export type UpdateOrderInput = Partial<CreateOrderInput>;
 function rowToOrder(row: Record<string, unknown>): Order {
   return {
     id: Number(row.id),
-    customer_name: String(row.customer_name),
+    supplier_name: String(row.supplier_name),
     contact_number: (row.contact_number as string | null) ?? null,
-    delivery_address: String(row.delivery_address),
+    delivery_address: (row.delivery_address as string | null) ?? null,
     items: (row.items as OrderItem[]) ?? [],
     order_date: row.order_date ? toDateStr(row.order_date) : "",
     expected_delivery_date: row.expected_delivery_date ? toDateStr(row.expected_delivery_date) : null,
@@ -29,6 +29,8 @@ function rowToOrder(row: Record<string, unknown>): Order {
     invoice_number: (row.invoice_number as string | null) ?? null,
     invoice_amount: row.invoice_amount != null ? String(row.invoice_amount) : null,
     invoice_date: row.invoice_date ? toDateStr(row.invoice_date) : null,
+    invoice_url: (row.invoice_url as string | null) ?? null,
+    invoice_file_url: (row.invoice_file_url as string | null) ?? null,
     payment_terms: (row.payment_terms as PaymentTerms) ?? "net_30",
     payment_due_date: row.payment_due_date ? toDateStr(row.payment_due_date) : null,
     paid: Boolean(row.paid),
@@ -59,12 +61,12 @@ export async function getOrder(id: number): Promise<Order | null> {
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const { rows } = await sql`
     INSERT INTO orders (
-      customer_name, contact_number, delivery_address, items,
+      supplier_name, contact_number, delivery_address, items,
       order_date, expected_delivery_date, payment_terms, notes
     ) VALUES (
-      ${input.customer_name},
+      ${input.supplier_name},
       ${input.contact_number ?? null},
-      ${input.delivery_address},
+      ${input.delivery_address ?? null},
       ${JSON.stringify(input.items)}::jsonb,
       ${input.order_date},
       ${input.expected_delivery_date ?? null},
@@ -82,15 +84,24 @@ export async function updateOrder(id: number, input: UpdateOrderInput): Promise<
   const merged = { ...existing, ...input };
   const { rows } = await sql`
     UPDATE orders SET
-      customer_name = ${merged.customer_name},
+      supplier_name = ${merged.supplier_name},
       contact_number = ${merged.contact_number ?? null},
-      delivery_address = ${merged.delivery_address},
+      delivery_address = ${merged.delivery_address ?? null},
       items = ${JSON.stringify(merged.items)}::jsonb,
       order_date = ${merged.order_date},
       expected_delivery_date = ${merged.expected_delivery_date ?? null},
       payment_terms = ${merged.payment_terms},
       notes = ${merged.notes ?? null},
       updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] ? rowToOrder(rows[0]) : null;
+}
+
+export async function updateNotes(id: number, notes: string | null): Promise<Order | null> {
+  const { rows } = await sql`
+    UPDATE orders SET notes = ${notes}, updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
   `;
@@ -118,11 +129,22 @@ export async function confirmDelivery(
   return rows[0] ? rowToOrder(rows[0]) : null;
 }
 
+export async function markDelivered(id: number, date: string): Promise<Order | null> {
+  const { rows } = await sql`
+    UPDATE orders SET actual_delivery_date = ${date}, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] ? rowToOrder(rows[0]) : null;
+}
+
 export async function recordInvoice(
   id: number,
   invoice_number: string,
   invoice_amount: number,
   invoice_date: string,
+  invoice_url?: string | null,
+  invoice_file_url?: string | null,
 ): Promise<Order | null> {
   const existing = await getOrder(id);
   if (!existing) return null;
@@ -132,6 +154,8 @@ export async function recordInvoice(
       invoice_number = ${invoice_number},
       invoice_amount = ${invoice_amount},
       invoice_date = ${invoice_date},
+      invoice_url = ${invoice_url ?? null},
+      invoice_file_url = ${invoice_file_url ?? null},
       payment_due_date = ${due},
       updated_at = NOW()
     WHERE id = ${id}
@@ -151,6 +175,15 @@ export async function recordPayment(
       paid_date = ${paid_date},
       paid_amount = ${paid_amount},
       updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] ? rowToOrder(rows[0]) : null;
+}
+
+export async function clearPayment(id: number): Promise<Order | null> {
+  const { rows } = await sql`
+    UPDATE orders SET paid = FALSE, paid_date = NULL, paid_amount = NULL, updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
   `;

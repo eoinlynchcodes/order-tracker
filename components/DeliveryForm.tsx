@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { OrderItem } from "@/lib/types";
 
-type Row = OrderItem & { confirmed: number };
+type Row = { name: string; quantity: number; confirmed: number };
 
 export function DeliveryForm({
   orderId,
@@ -38,7 +38,6 @@ export function DeliveryForm({
         delivered_items: rows.map((r) => ({
           name: r.name,
           quantity: Number(r.confirmed),
-          unit: r.unit,
         })),
       }),
     });
@@ -71,7 +70,6 @@ export function DeliveryForm({
               <th className="py-1">Item</th>
               <th className="py-1 text-right">Ordered</th>
               <th className="py-1 text-right">Delivered</th>
-              <th className="py-1">Unit</th>
             </tr>
           </thead>
           <tbody>
@@ -93,7 +91,6 @@ export function DeliveryForm({
                       }`}
                     />
                   </td>
-                  <td className="py-1 text-slate-500">{r.unit ?? "—"}</td>
                 </tr>
               );
             })}

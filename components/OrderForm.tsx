@@ -13,15 +13,14 @@ export function OrderForm({ initial, mode }: Props) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [customerName, setCustomerName] = useState(initial?.customer_name ?? "");
+  const [supplierName, setSupplierName] = useState(initial?.supplier_name ?? "");
   const [contactNumber, setContactNumber] = useState(initial?.contact_number ?? "");
-  const [deliveryAddress, setDeliveryAddress] = useState(initial?.delivery_address ?? "");
   const [orderDate, setOrderDate] = useState(initial?.order_date ?? today);
   const [expectedDelivery, setExpectedDelivery] = useState(initial?.expected_delivery_date ?? "");
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>(initial?.payment_terms ?? "net_30");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItem[]>(
-    initial?.items?.length ? initial.items : [{ name: "", quantity: 1, unit: "" }],
+    initial?.items?.length ? initial.items.map((i) => ({ name: i.name, quantity: i.quantity })) : [{ name: "", quantity: 1 }],
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +29,7 @@ export function OrderForm({ initial, mode }: Props) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
   function addItem() {
-    setItems((prev) => [...prev, { name: "", quantity: 1, unit: "" }]);
+    setItems((prev) => [...prev, { name: "", quantity: 1 }]);
   }
   function removeItem(idx: number) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
@@ -40,7 +39,7 @@ export function OrderForm({ initial, mode }: Props) {
     e.preventDefault();
     setError(null);
     const cleanItems = items
-      .map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity), unit: i.unit?.trim() || undefined }))
+      .map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity) }))
       .filter((i) => i.name && i.quantity > 0);
     if (cleanItems.length === 0) {
       setError("Add at least one item.");
@@ -48,9 +47,8 @@ export function OrderForm({ initial, mode }: Props) {
     }
     setSaving(true);
     const payload = {
-      customer_name: customerName,
+      supplier_name: supplierName,
       contact_number: contactNumber || null,
-      delivery_address: deliveryAddress,
       items: cleanItems,
       order_date: orderDate,
       expected_delivery_date: expectedDelivery || null,
@@ -76,12 +74,12 @@ export function OrderForm({ initial, mode }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Section title="Customer">
-        <Field label="Customer name" required>
+      <Section title="Supplier">
+        <Field label="Supplier name" required>
           <input
             className={inputCls}
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            value={supplierName}
+            onChange={(e) => setSupplierName(e.target.value)}
             required
           />
         </Field>
@@ -92,15 +90,6 @@ export function OrderForm({ initial, mode }: Props) {
             onChange={(e) => setContactNumber(e.target.value)}
           />
         </Field>
-        <Field label="Delivery address" required>
-          <textarea
-            className={inputCls}
-            value={deliveryAddress}
-            onChange={(e) => setDeliveryAddress(e.target.value)}
-            rows={2}
-            required
-          />
-        </Field>
       </Section>
 
       <Section title="Items">
@@ -109,7 +98,7 @@ export function OrderForm({ initial, mode }: Props) {
             <div key={idx} className="flex gap-2">
               <input
                 className={`${inputCls} flex-1`}
-                placeholder="Item name (e.g. Bark mulch)"
+                placeholder="Product / item (e.g. Trallnor T100, Bark mulch m³, …)"
                 value={it.name}
                 onChange={(e) => updateItem(idx, { name: e.target.value })}
               />
@@ -122,16 +111,11 @@ export function OrderForm({ initial, mode }: Props) {
                 value={it.quantity}
                 onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
               />
-              <input
-                className={`${inputCls} w-28`}
-                placeholder="Unit (m³, bag…)"
-                value={it.unit ?? ""}
-                onChange={(e) => updateItem(idx, { unit: e.target.value })}
-              />
               <button
                 type="button"
                 onClick={() => removeItem(idx)}
                 className="rounded border border-slate-300 px-2 text-sm hover:bg-slate-100"
+                aria-label="Remove item"
               >
                 ✕
               </button>

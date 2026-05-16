@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteOrder, getOrder, updateOrder } from "@/lib/db";
+import { deleteOrder, getOrder, updateNotes, updateOrder } from "@/lib/db";
 import type { OrderItem, PaymentTerms } from "@/lib/types";
 import { PAYMENT_TERMS } from "@/lib/types";
 
@@ -27,15 +27,26 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   }
 
   const updated = await updateOrder(Number(id), {
-    customer_name: body.customer_name,
+    supplier_name: body.supplier_name,
     contact_number: body.contact_number ?? null,
-    delivery_address: body.delivery_address,
+    delivery_address: body.delivery_address ?? null,
     items: body.items as OrderItem[] | undefined,
     order_date: body.order_date,
     expected_delivery_date: body.expected_delivery_date ?? null,
     payment_terms: body.payment_terms as PaymentTerms | undefined,
     notes: body.notes ?? null,
   });
+  if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json(updated);
+}
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const body = await req.json();
+  if (!("notes" in body)) {
+    return NextResponse.json({ error: "only notes patching supported" }, { status: 400 });
+  }
+  const updated = await updateNotes(Number(id), body.notes ?? null);
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);
 }
