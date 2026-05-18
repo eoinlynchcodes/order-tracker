@@ -36,14 +36,16 @@ export default async function OrderDetail({
             Edit
           </Link>
           <DeleteOrderButton orderId={order.id} supplierName={order.supplier_name} />
-          {!order.actual_delivery_date && (
-            <Link
-              href={`/orders/${order.id}/delivery`}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
-              Confirm delivery
-            </Link>
-          )}
+          <Link
+            href={`/orders/${order.id}/delivery`}
+            className={`rounded px-3 py-1.5 text-sm text-white ${
+              order.actual_delivery_date
+                ? "bg-slate-500 hover:bg-slate-600"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {order.actual_delivery_date ? "Re-check stock" : "Check in stock"}
+          </Link>
           {order.actual_delivery_date && (
             <Link
               href={`/orders/${order.id}/invoice`}
@@ -83,14 +85,14 @@ export default async function OrderDetail({
           <ItemTable items={order.items} />
         </Card>
 
-        <Card title="Items delivered">
+        <Card title="Stock checked in">
           {order.delivery_confirmed_items ? (
             <DeliveryComparison
               ordered={order.items}
               delivered={order.delivery_confirmed_items}
             />
           ) : (
-            <p className="text-sm text-slate-500">Delivery not yet confirmed.</p>
+            <p className="text-sm text-slate-500">Stock not yet checked in.</p>
           )}
         </Card>
 
@@ -211,7 +213,7 @@ function DeliveryComparison({
         <tr>
           <th className="py-1">Item</th>
           <th className="py-1 text-right">Ordered</th>
-          <th className="py-1 text-right">Delivered</th>
+          <th className="py-1 text-right">Checked&nbsp;in</th>
           <th className="py-1 text-right">Δ</th>
         </tr>
       </thead>
