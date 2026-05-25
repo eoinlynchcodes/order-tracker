@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { parsePasted } from "@/lib/parsePasted";
 import { PAYMENT_TERMS, type Order, type OrderItem, type PaymentTerms } from "@/lib/types";
 
 type Props = {
@@ -42,6 +43,35 @@ export function OrderForm({ initial, mode }: Props) {
   const [parsedFromName, setParsedFromName] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pasteText, setPasteText] = useState("");
+  const [pasteWarnings, setPasteWarnings] = useState<string[]>([]);
+  const [pasteSummary, setPasteSummary] = useState<string | null>(null);
+
+  function handleParsePaste(mode: "replace" | "append") {
+    setPasteWarnings([]);
+    setPasteSummary(null);
+    const { items: parsed, warnings } = parsePasted(pasteText);
+    if (parsed.length === 0) {
+      setPasteWarnings(warnings.length ? warnings : ["No items found."]);
+      return;
+    }
+    const mapped: OrderItem[] = parsed.map((p) => ({
+      name: p.name,
+      quantity: p.quantity,
+      code: p.code,
+      notes: null,
+    }));
+    setItems((prev) => {
+      if (mode === "replace") return mapped;
+      const existing = prev.filter((it) => it.name.trim() || (it.code ?? "").trim());
+      return [...existing, ...mapped];
+    });
+    setPasteSummary(
+      `${mode === "replace" ? "Replaced with" : "Appended"} ${parsed.length} item${parsed.length === 1 ? "" : "s"}.`,
+    );
+    setPasteWarnings(warnings);
+  }
 
   async function handleFile(file: File) {
     setParseError(null);
@@ -215,6 +245,66 @@ export function OrderForm({ initial, mode }: Props) {
               <a href={invoiceFileUrl} target="_blank" rel="noreferrer" className="underline">
                 view PDF
               </a>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {mode === "create" && (
+        <Section title="Or paste data (from a webpage or spreadsheet)">
+          <textarea
+            className={`${inputCls} font-mono text-xs`}
+            placeholder={
+              "Paste rows here. Expected columns include Qty, Product ID, Product name, e.g.\n\nQty\tProduct ID\tProduct name\tPrice\tTotal price\n5\tWCF150\tINTERTRADE WEED CONTROL FABRIC 1M X 50M\t€16.90\t€84.50"
+            }
+            rows={6}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleParsePaste("replace")}
+              disabled={!pasteText.trim()}
+              className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              Parse → replace items
+            </button>
+            <button
+              type="button"
+              onClick={() => handleParsePaste("append")}
+              disabled={!pasteText.trim()}
+              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            >
+              Parse → append items
+            </button>
+            {pasteText && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPasteText("");
+                  setPasteWarnings([]);
+                  setPasteSummary(null);
+                }}
+                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {pasteSummary && (
+            <div className="mt-2 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {pasteSummary}
+            </div>
+          )}
+          {pasteWarnings.length > 0 && (
+            <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <div className="mb-1 font-medium">Notes:</div>
+              <ul className="list-disc space-y-0.5 pl-4">
+                {pasteWarnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
             </div>
           )}
         </Section>
