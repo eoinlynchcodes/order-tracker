@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parsePasted } from "@/lib/parsePasted";
 import { PAYMENT_TERMS, type Order, type OrderItem, type PaymentTerms } from "@/lib/types";
+
+type SupplierSuggestion = { name: string; contact_number: string | null };
 
 type Props = {
   initial?: Order;
@@ -47,6 +49,28 @@ export function OrderForm({ initial, mode }: Props) {
   const [pasteText, setPasteText] = useState("");
   const [pasteWarnings, setPasteWarnings] = useState<string[]>([]);
   const [pasteSummary, setPasteSummary] = useState<string | null>(null);
+
+  const [suppliers, setSuppliers] = useState<SupplierSuggestion[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/suppliers")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: SupplierSuggestion[]) => {
+        if (!cancelled && Array.isArray(data)) setSuppliers(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleSupplierChange(value: string) {
+    setSupplierName(value);
+    const match = suppliers.find((s) => s.name.toLowerCase() === value.trim().toLowerCase());
+    if (match && !contactNumber && match.contact_number) {
+      setContactNumber(match.contact_number);
+    }
+  }
 
   function handleParsePaste(mode: "replace" | "append") {
     setPasteWarnings([]);
@@ -315,9 +339,18 @@ export function OrderForm({ initial, mode }: Props) {
           <input
             className={inputCls}
             value={supplierName}
-            onChange={(e) => setSupplierName(e.target.value)}
+            onChange={(e) => handleSupplierChange(e.target.value)}
+            list="known-suppliers"
+            autoComplete="off"
             required
           />
+          {suppliers.length > 0 && (
+            <datalist id="known-suppliers">
+              {suppliers.map((s) => (
+                <option key={s.name} value={s.name} />
+              ))}
+            </datalist>
+          )}
         </Field>
         <Field label="Contact number">
           <input

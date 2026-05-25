@@ -63,6 +63,30 @@ export async function listOrders(): Promise<Order[]> {
   return rows.map(rowToOrder);
 }
 
+export type SupplierSuggestion = {
+  name: string;
+  contact_number: string | null;
+};
+
+export async function listSuppliers(): Promise<SupplierSuggestion[]> {
+  const { rows } = await sql`
+    SELECT DISTINCT ON (LOWER(supplier_name))
+      supplier_name,
+      contact_number
+    FROM orders
+    WHERE deleted_at IS NULL
+      AND supplier_name IS NOT NULL
+      AND supplier_name <> ''
+    ORDER BY LOWER(supplier_name), created_at DESC
+  `;
+  return rows
+    .map((r) => ({
+      name: String(r.supplier_name),
+      contact_number: (r.contact_number as string | null) ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
 export async function listDeletedOrders(): Promise<Order[]> {
   const { rows } = await sql`
     SELECT * FROM orders WHERE deleted_at IS NOT NULL
