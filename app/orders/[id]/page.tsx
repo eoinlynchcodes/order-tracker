@@ -140,6 +140,11 @@ export default async function OrderDetail({
           <Row label="Paid">{order.paid ? "Yes" : "No"}</Row>
           <Row label="Paid date">{order.paid_date ?? "—"}</Row>
           <Row label="Paid amount">{order.paid_amount ? `€${order.paid_amount}` : "—"}</Row>
+          {order.payment_notes && (
+            <Row label="Notes">
+              <span className="whitespace-pre-wrap">{order.payment_notes}</span>
+            </Row>
+          )}
         </Card>
 
         {order.notes && (
@@ -170,20 +175,34 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function ItemTable({ items }: { items: { name: string; quantity: number }[] }) {
+function ItemTable({
+  items,
+}: {
+  items: { name: string; quantity: number; code?: string | null; notes?: string | null }[];
+}) {
+  const hasCode = items.some((it) => it.code);
+  const hasNotes = items.some((it) => it.notes);
   return (
     <table className="w-full text-sm">
       <thead className="text-left text-xs uppercase text-slate-500">
         <tr>
+          {hasCode && <th className="py-1 pr-3">Code</th>}
           <th className="py-1">Item</th>
           <th className="py-1 text-right">Qty</th>
+          {hasNotes && <th className="py-1 pl-3">Notes</th>}
         </tr>
       </thead>
       <tbody>
         {items.map((it, i) => (
-          <tr key={i} className="border-t border-slate-100">
+          <tr key={i} className="border-t border-slate-100 align-top">
+            {hasCode && (
+              <td className="py-1 pr-3 font-mono text-xs text-slate-600">{it.code ?? ""}</td>
+            )}
             <td className="py-1">{it.name}</td>
             <td className="py-1 text-right">{it.quantity}</td>
+            {hasNotes && (
+              <td className="py-1 pl-3 text-xs text-slate-600">{it.notes ?? ""}</td>
+            )}
           </tr>
         ))}
       </tbody>

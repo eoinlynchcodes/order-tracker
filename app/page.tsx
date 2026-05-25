@@ -84,11 +84,7 @@ function compare(a: Order, b: Order, key: SortKey, dir: SortDir): number {
     case "order_date":
       return mul * cmpStr(a.order_date, b.order_date) || (b.id - a.id);
     case "amount":
-      return cmpNullable(
-        a.invoice_amount != null ? Number(a.invoice_amount) : null,
-        b.invoice_amount != null ? Number(b.invoice_amount) : null,
-        mul,
-      );
+      return cmpNullable(amountForSort(a), amountForSort(b), mul);
     case "due_date":
       return cmpNullable(a.payment_due_date, b.payment_due_date, mul);
   }
@@ -96,6 +92,12 @@ function compare(a: Order, b: Order, key: SortKey, dir: SortDir): number {
 
 function cmpStr(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function amountForSort(o: Order): number | null {
+  if (o.invoice_amount != null) return Number(o.invoice_amount);
+  if (o.paid_amount != null) return Number(o.paid_amount);
+  return null;
 }
 
 function cmpNullable<T extends string | number>(a: T | null, b: T | null, mul: number): number {

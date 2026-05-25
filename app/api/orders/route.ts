@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
     expected_delivery_date: body.expected_delivery_date || null,
     payment_terms: body.payment_terms as PaymentTerms,
     notes: body.notes ? String(body.notes) : null,
+    invoice_file_url: body.invoice_file_url ? String(body.invoice_file_url) : null,
+    paid: Boolean(body.paid),
+    paid_date: body.paid_date ? String(body.paid_date) : null,
+    paid_amount: body.paid_amount != null && body.paid_amount !== "" ? Number(body.paid_amount) : null,
+    payment_notes: body.payment_notes ? String(body.payment_notes) : null,
   });
   return NextResponse.json(order, { status: 201 });
 }

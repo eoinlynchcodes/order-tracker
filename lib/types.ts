@@ -1,6 +1,7 @@
-export type PaymentTerms = "net_7" | "net_30" | "net_60" | "on_account";
+export type PaymentTerms = "prepaid" | "net_7" | "net_30" | "net_60" | "on_account";
 
 export const PAYMENT_TERMS: { value: PaymentTerms; label: string; days: number | null }[] = [
+  { value: "prepaid", label: "Prepaid (before delivery)", days: 0 },
   { value: "net_7", label: "Net 7", days: 7 },
   { value: "net_30", label: "Net 30", days: 30 },
   { value: "net_60", label: "Net 60", days: 60 },
@@ -10,6 +11,8 @@ export const PAYMENT_TERMS: { value: PaymentTerms; label: string; days: number |
 export type OrderItem = {
   name: string;
   quantity: number;
+  code?: string | null;
+  notes?: string | null;
 };
 
 export type OrderStatus =
@@ -39,6 +42,7 @@ export type Order = {
   paid: boolean;
   paid_date: string | null;
   paid_amount: string | null;
+  payment_notes: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

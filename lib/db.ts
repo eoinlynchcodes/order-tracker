@@ -11,6 +11,11 @@ export type CreateOrderInput = {
   expected_delivery_date?: string | null;
   payment_terms: PaymentTerms;
   notes?: string | null;
+  invoice_file_url?: string | null;
+  paid?: boolean;
+  paid_date?: string | null;
+  paid_amount?: number | null;
+  payment_notes?: string | null;
 };
 
 export type UpdateOrderInput = Partial<CreateOrderInput>;
@@ -36,6 +41,7 @@ function rowToOrder(row: Record<string, unknown>): Order {
     paid: Boolean(row.paid),
     paid_date: row.paid_date ? toDateStr(row.paid_date) : null,
     paid_amount: row.paid_amount != null ? String(row.paid_amount) : null,
+    payment_notes: (row.payment_notes as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -76,10 +82,15 @@ export async function getOrder(id: number): Promise<Order | null> {
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
+  const paid = Boolean(input.paid);
+  const paid_date = paid ? input.paid_date ?? null : null;
+  const paid_amount = paid ? input.paid_amount ?? null : null;
   const { rows } = await sql`
     INSERT INTO orders (
       supplier_name, contact_number, delivery_address, items,
-      order_date, expected_delivery_date, payment_terms, notes
+      order_date, expected_delivery_date, payment_terms, notes,
+      invoice_file_url,
+      paid, paid_date, paid_amount, payment_notes
     ) VALUES (
       ${input.supplier_name},
       ${input.contact_number ?? null},
@@ -88,7 +99,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       ${input.order_date},
       ${input.expected_delivery_date ?? null},
       ${input.payment_terms},
-      ${input.notes ?? null}
+      ${input.notes ?? null},
+      ${input.invoice_file_url ?? null},
+      ${paid},
+      ${paid_date},
+      ${paid_amount},
+      ${input.payment_notes ?? null}
     )
     RETURNING *
   `;
@@ -109,6 +125,7 @@ export async function updateOrder(id: number, input: UpdateOrderInput): Promise<
       expected_delivery_date = ${merged.expected_delivery_date ?? null},
       payment_terms = ${merged.payment_terms},
       notes = ${merged.notes ?? null},
+      payment_notes = ${merged.payment_notes ?? null},
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

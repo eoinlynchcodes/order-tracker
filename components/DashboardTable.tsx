@@ -180,7 +180,15 @@ export function DashboardTable({
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    {order.invoice_amount != null ? `€${order.invoice_amount}` : "—"}
+                    {order.invoice_amount != null ? (
+                      `€${order.invoice_amount}`
+                    ) : order.paid_amount != null ? (
+                      <span title="Paid amount — no invoice recorded yet">
+                        €{order.paid_amount}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td
                     className={`px-3 py-2 ${

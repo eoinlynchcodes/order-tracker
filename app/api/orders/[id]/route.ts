@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     expected_delivery_date: body.expected_delivery_date ?? null,
     payment_terms: body.payment_terms as PaymentTerms | undefined,
     notes: body.notes ?? null,
+    payment_notes: body.payment_notes ?? null,
   });
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);

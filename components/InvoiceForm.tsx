@@ -39,10 +39,12 @@ export function InvoiceForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [parsedFromName, setParsedFromName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function uploadFile(file: File) {
     setError(null);
+    setParsedFromName(null);
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setError(`Unsupported file type: ${file.type || "(unknown)"}. Use PDF or PNG/JPEG/WebP/HEIC.`);
       return;
@@ -54,7 +56,7 @@ export function InvoiceForm({
     setUploading(true);
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`/api/orders/${orderId}/invoice-file`, {
+    const res = await fetch(`/api/orders/${orderId}/invoice/parse`, {
       method: "POST",
       body: form,
     });
@@ -64,8 +66,23 @@ export function InvoiceForm({
       setError(data.error ?? "Upload failed");
       return;
     }
-    const data = await res.json();
-    setFileUrl(data.url);
+    const data = (await res.json()) as {
+      file_url: string;
+      parsed: {
+        invoice_number: string | null;
+        invoice_amount: number | null;
+        invoice_date: string | null;
+      } | null;
+    };
+    setFileUrl(data.file_url);
+    if (data.parsed) {
+      if (data.parsed.invoice_number) setInvoiceNumber(data.parsed.invoice_number);
+      if (data.parsed.invoice_amount != null) setAmount(String(data.parsed.invoice_amount));
+      if (data.parsed.invoice_date) setDate(data.parsed.invoice_date);
+      const anyField =
+        data.parsed.invoice_number || data.parsed.invoice_amount != null || data.parsed.invoice_date;
+      if (anyField) setParsedFromName(file.name);
+    }
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -163,7 +180,20 @@ export function InvoiceForm({
           />
         </Field>
 
-        <Field label="Or upload the invoice file (PDF / image, max 10MB)">
+        <div className="mb-3 block last:mb-0">
+          <span className="mb-1 block text-xs font-medium text-slate-700">
+            Or upload the invoice file (PDF / image, max 10MB) — invoice #, amount, and date will be auto-filled
+          </span>
+          {/* Plain <input> NOT inside a <label> — clicks elsewhere in the form must not re-open the OS file picker */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            onChange={handleInputChange}
+            disabled={uploading}
+            className="sr-only"
+            tabIndex={-1}
+          />
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -185,17 +215,8 @@ export function InvoiceForm({
                 : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100"
             } ${uploading ? "pointer-events-none opacity-60" : ""}`}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPT_ATTR}
-              onChange={handleInputChange}
-              disabled={uploading}
-              className="sr-only"
-              tabIndex={-1}
-            />
             {uploading ? (
-              <p className="text-sm text-slate-600">Uploading…</p>
+              <p className="text-sm text-slate-600">Uploading &amp; reading invoice…</p>
             ) : (
               <>
                 <p className="text-sm font-medium text-slate-700">
@@ -206,6 +227,11 @@ export function InvoiceForm({
             )}
           </div>
 
+          {parsedFromName && (
+            <div className="mt-2 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              ✓ Prefilled invoice #, amount, and date from <span className="font-medium">{parsedFromName}</span>. Review and edit above before saving.
+            </div>
+          )}
           {fileUrl && (
             <div className="mt-2 flex items-center gap-3 text-xs">
               <a
@@ -218,9 +244,9 @@ export function InvoiceForm({
               </a>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setFileUrl("");
+                  setParsedFromName(null);
                 }}
                 className="text-red-600 hover:underline"
               >
@@ -228,7 +254,7 @@ export function InvoiceForm({
               </button>
             </div>
           )}
-        </Field>
+        </div>
       </div>
 
       {error && (

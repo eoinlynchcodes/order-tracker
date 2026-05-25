@@ -32,7 +32,12 @@ export async function GET() {
 
   const lines = [headers.join(",")];
   for (const o of orders) {
-    const itemsStr = o.items.map((i) => `${i.quantity}x ${i.name}`).join("; ");
+    const itemsStr = o.items
+      .map(
+        (i) =>
+          `${i.quantity}x ${i.code ? `[${i.code}] ` : ""}${i.name}${i.notes ? ` (${i.notes})` : ""}`,
+      )
+      .join("; ");
     const row = [
       o.id,
       computeStatus(o),

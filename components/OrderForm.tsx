@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PAYMENT_TERMS, type Order, type OrderItem, type PaymentTerms } from "@/lib/types";
 
 type Props = {
@@ -18,18 +18,88 @@ export function OrderForm({ initial, mode }: Props) {
   const [orderDate, setOrderDate] = useState(initial?.order_date ?? today);
   const [expectedDelivery, setExpectedDelivery] = useState(initial?.expected_delivery_date ?? "");
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>(initial?.payment_terms ?? "net_30");
+  const [paid, setPaid] = useState<boolean>(initial?.paid ?? false);
+  const [paidDate, setPaidDate] = useState(initial?.paid_date ?? "");
+  const [paidAmount, setPaidAmount] = useState<string>(initial?.paid_amount ?? "");
+  const [paymentNotes, setPaymentNotes] = useState(initial?.payment_notes ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItem[]>(
-    initial?.items?.length ? initial.items.map((i) => ({ name: i.name, quantity: i.quantity })) : [{ name: "", quantity: 1 }],
+    initial?.items?.length
+      ? initial.items.map((i) => ({
+          name: i.name,
+          quantity: i.quantity,
+          code: i.code ?? null,
+          notes: i.notes ?? null,
+        }))
+      : [{ name: "", quantity: 1, code: null, notes: null }],
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [invoiceFileUrl, setInvoiceFileUrl] = useState<string | null>(initial?.invoice_file_url ?? null);
+  const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parsedFromName, setParsedFromName] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setParseError(null);
+    if (file.type !== "application/pdf") {
+      setParseError("Only PDF files are supported.");
+      return;
+    }
+    setParsing(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/orders/parse-pdf", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Parse failed (${res.status})`);
+      }
+      const { parsed, file_url } = (await res.json()) as {
+        parsed: {
+          supplier_name: string;
+          contact_number: string | null;
+          order_date: string;
+          payment_terms: PaymentTerms | null;
+          payment_notes: string | null;
+          items: { name: string; quantity: number; code?: string | null }[];
+        };
+        file_url: string;
+      };
+      if (parsed.supplier_name) setSupplierName(parsed.supplier_name);
+      if (parsed.contact_number) setContactNumber(parsed.contact_number);
+      if (parsed.order_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.order_date)) {
+        setOrderDate(parsed.order_date);
+      }
+      if (parsed.payment_terms) setPaymentTerms(parsed.payment_terms);
+      if (parsed.payment_notes) setPaymentNotes(parsed.payment_notes);
+      if (parsed.items?.length) {
+        setItems(
+          parsed.items.map((i) => ({
+            name: String(i.name ?? ""),
+            quantity: Number(i.quantity) || 1,
+            code: i.code ? String(i.code) : null,
+            notes: null,
+          })),
+        );
+      }
+      setInvoiceFileUrl(file_url);
+      setParsedFromName(file.name);
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : "Parse failed");
+    } finally {
+      setParsing(false);
+    }
+  }
 
   function updateItem(idx: number, patch: Partial<OrderItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
   function addItem() {
-    setItems((prev) => [...prev, { name: "", quantity: 1 }]);
+    setItems((prev) => [...prev, { name: "", quantity: 1, code: null, notes: null }]);
   }
   function removeItem(idx: number) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
@@ -39,13 +109,23 @@ export function OrderForm({ initial, mode }: Props) {
     e.preventDefault();
     setError(null);
     const cleanItems = items
-      .map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity) }))
+      .map((i) => ({
+        name: i.name.trim(),
+        quantity: Number(i.quantity),
+        code: i.code?.trim() ? i.code.trim() : null,
+        notes: i.notes?.trim() ? i.notes.trim() : null,
+      }))
       .filter((i) => i.name && i.quantity > 0);
     if (cleanItems.length === 0) {
       setError("Add at least one item.");
       return;
     }
     setSaving(true);
+    const paidAmountNum = paidAmount.trim() === "" ? null : Number(paidAmount);
+    if (paid && paidAmountNum != null && Number.isNaN(paidAmountNum)) {
+      setError("Paid amount must be a number.");
+      return;
+    }
     const payload = {
       supplier_name: supplierName,
       contact_number: contactNumber || null,
@@ -54,6 +134,11 @@ export function OrderForm({ initial, mode }: Props) {
       expected_delivery_date: expectedDelivery || null,
       payment_terms: paymentTerms,
       notes: notes || null,
+      invoice_file_url: invoiceFileUrl,
+      paid,
+      paid_date: paid ? paidDate || null : null,
+      paid_amount: paid ? paidAmountNum : null,
+      payment_notes: paymentNotes || null,
     };
     const url = mode === "create" ? "/api/orders" : `/api/orders/${initial!.id}`;
     const res = await fetch(url, {
@@ -74,6 +159,67 @@ export function OrderForm({ initial, mode }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {mode === "create" && (
+        <Section title="Upload delivery note / invoice (optional)">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleFile(f);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed p-6 text-center text-sm transition-colors ${
+              dragActive ? "border-slate-500 bg-slate-50" : "border-slate-300 bg-slate-50/50"
+            } ${parsing ? "pointer-events-none opacity-60" : "hover:bg-slate-50"}`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+            />
+            {parsing ? (
+              <span className="text-slate-600">Reading PDF…</span>
+            ) : parsedFromName ? (
+              <span className="text-slate-700">
+                ✓ Prefilled from <span className="font-medium">{parsedFromName}</span> — review and edit below, then save.
+              </span>
+            ) : (
+              <>
+                <span className="text-slate-700">Drop a PDF here, or click to upload</span>
+                <span className="mt-1 text-xs text-slate-500">
+                  We&apos;ll pull out supplier, date, and items so you can review them before saving.
+                </span>
+              </>
+            )}
+          </div>
+          {parseError && (
+            <div className="mt-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {parseError}
+            </div>
+          )}
+          {invoiceFileUrl && !parsing && (
+            <div className="mt-2 text-xs text-slate-600">
+              Attached:{" "}
+              <a href={invoiceFileUrl} target="_blank" rel="noreferrer" className="underline">
+                view PDF
+              </a>
+            </div>
+          )}
+        </Section>
+      )}
+
       <Section title="Supplier">
         <Field label="Supplier name" required>
           <input
@@ -93,28 +239,50 @@ export function OrderForm({ initial, mode }: Props) {
       </Section>
 
       <Section title="Items">
+        <div className="mb-1 hidden gap-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-500 md:grid md:grid-cols-[7rem_minmax(0,2fr)_4.5rem_minmax(0,1.5fr)_1.75rem]">
+          <span>Code</span>
+          <span>Item description</span>
+          <span className="text-right">Qty</span>
+          <span>Notes</span>
+          <span aria-hidden />
+        </div>
         <div className="space-y-2">
           {items.map((it, idx) => (
-            <div key={idx} className="flex gap-2">
+            <div
+              key={idx}
+              className="grid grid-cols-2 gap-2 md:grid-cols-[7rem_minmax(0,2fr)_4.5rem_minmax(0,1.5fr)_1.75rem] md:items-start"
+            >
               <input
-                className={`${inputCls} flex-1`}
-                placeholder="Product / item (e.g. Trallnor T100, Bark mulch m³, …)"
+                className={`${inputCls} font-mono text-xs`}
+                placeholder="Code (e.g. G32320)"
+                value={it.code ?? ""}
+                onChange={(e) => updateItem(idx, { code: e.target.value || null })}
+              />
+              <input
+                className={inputCls}
+                placeholder="Product description (e.g. Gallagher M350 mains unit)"
                 value={it.name}
                 onChange={(e) => updateItem(idx, { name: e.target.value })}
               />
               <input
                 type="number"
-                className={`${inputCls} w-24`}
+                className={`${inputCls} text-right`}
                 placeholder="Qty"
                 min={0}
                 step="0.01"
                 value={it.quantity}
                 onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
               />
+              <input
+                className={inputCls}
+                placeholder="Notes (optional)"
+                value={it.notes ?? ""}
+                onChange={(e) => updateItem(idx, { notes: e.target.value || null })}
+              />
               <button
                 type="button"
                 onClick={() => removeItem(idx)}
-                className="rounded border border-slate-300 px-2 text-sm hover:bg-slate-100"
+                className="col-span-2 rounded border border-slate-300 px-2 text-sm hover:bg-slate-100 md:col-span-1"
                 aria-label="Remove item"
               >
                 ✕
@@ -160,6 +328,57 @@ export function OrderForm({ initial, mode }: Props) {
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
+          </Field>
+        </div>
+
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={paid}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setPaid(checked);
+                if (checked && !paidDate) setPaidDate(today);
+              }}
+            />
+            <span className="font-medium text-slate-700">Already paid</span>
+          </label>
+
+          {paid && (
+            <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Paid date" required>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={paidDate}
+                  onChange={(e) => setPaidDate(e.target.value)}
+                  required={paid}
+                />
+              </Field>
+              <Field label="Paid amount (€)">
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  className={inputCls}
+                  placeholder="0.00"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                />
+              </Field>
+            </div>
+          )}
+
+          <Field label="Payment notes">
+            <textarea
+              className={inputCls}
+              placeholder="e.g. Paid via BACS, IBAN IE12…, cheque #1234, settle on account"
+              value={paymentNotes ?? ""}
+              onChange={(e) => setPaymentNotes(e.target.value)}
+              rows={2}
+            />
           </Field>
         </div>
       </Section>
